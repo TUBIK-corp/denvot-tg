@@ -81,6 +81,7 @@ def youtube_remix(video_url):
         os.remove(chunk_path)
 
     final_sound = concatenate_audioclips([AudioFileClip(sound_path) for sound_path in processed_sound_paths])
+    final_sound.gain = 20
 
     instrumental_audio_clip = AudioFileClip(instrumental_audio)
 
