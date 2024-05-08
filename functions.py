@@ -20,7 +20,9 @@ rvc_pitch = 6
 
 text2lip = Text2RVCLipSync(lip_api_key=api_key, rvc_path=rvc_path, model_path=model_path, lip_crop=True)
 
-separator = AudioSeparator()
+use_separator = True
+separator = None
+if use_separator: separator = AudioSeparator()
 
 def youtube_remix(video_url):
     global separator
@@ -49,15 +51,17 @@ def youtube_remix(video_url):
 
     video_clip = VideoFileClip(video_path)
     audio = video_clip.audio
-    audio_path = tempfile.mktemp(suffix=".mp3")
-    audio.write_audiofile(audio_path, fps=44100)
 
-    primary_stem_path, secondary_stem_path = separator(audio_path)
+    if use_separator:
+        audio_path = tempfile.mktemp(suffix=".mp3")
+        audio.write_audiofile(audio_path, fps=44100)
 
-    vocal_audio = primary_stem_path
-    instrumental_audio = secondary_stem_path
+        primary_stem_path, secondary_stem_path = separator(audio_path)
 
-    audio = AudioFileClip(vocal_audio)
+        vocal_audio = primary_stem_path
+        instrumental_audio = secondary_stem_path
+
+        audio = AudioFileClip(vocal_audio)
 
     chunk_duration = 30
     audio_chunks = []
@@ -83,11 +87,12 @@ def youtube_remix(video_url):
     final_sound = concatenate_audioclips([AudioFileClip(sound_path) for sound_path in processed_sound_paths])
     final_sound.gain = 20
 
-    instrumental_audio_clip = AudioFileClip(instrumental_audio)
-
-    merged_audio = CompositeAudioClip([final_sound, instrumental_audio_clip])
-
-    final_clip = video_clip.set_audio(merged_audio)
+    if use_separator:
+        instrumental_audio_clip = AudioFileClip(instrumental_audio)
+        merged_audio = CompositeAudioClip([final_sound, instrumental_audio_clip])
+        final_clip = video_clip.set_audio(merged_audio)
+    else:
+        final_clip = video_clip.set_audio(final_sound)
 
     output_video_path = tempfile.mktemp(suffix=".mp4")
     final_clip.write_videofile(output_video_path, codec="libx264", audio_codec="aac", fps=30)

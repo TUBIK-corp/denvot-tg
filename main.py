@@ -5,9 +5,12 @@ from threading import Thread
 from queue import Queue
 import config
 from tts_with_rvc_with_lipsync import Text2RVCLipSync
+import json
 
+with open('secrets.json', 'r') as f:
+    secrets = json.load(f)
 
-bot = telebot.TeleBot(config.tg_api)
+bot = telebot.TeleBot(secrets["tg_api"])
 
 request_queue = Queue()
 
@@ -95,6 +98,7 @@ def main():
 
     try:
         Thread(target=execute_requests, daemon=True).start()
+        print("DenVot-TG launched!")
         bot.infinity_polling()
     except:
         print("ok")
