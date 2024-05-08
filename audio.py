@@ -1,5 +1,6 @@
 from audio_separator.separator import Separator
 import time
+import os
 
 class AudioSeparator:
     def __init__(self,
@@ -8,7 +9,7 @@ class AudioSeparator:
                  denoise_enabled=True,
                  normalization_enabled=False,
                  model_file_dir='models',
-                 model_name='UVR_MDXNET_KARA_2',
+                 model_name='UVR-MDX-NET-Inst_HQ_3',
                  segment_size=256,
                  hop_length=1024,
                  log_formatter='%(asctime)s - %(name)s - %(levelname)s - %(message)s'):
@@ -20,6 +21,7 @@ class AudioSeparator:
                                    denoise_enabled=denoise_enabled,
                                    normalization_enabled=normalization_enabled,
                                    log_formatter=log_formatter)
+        self.output_dir = output_dir
         self.separator.load_model(model_name)
         print("Loaded model:", model_name)
 
@@ -32,7 +34,7 @@ class AudioSeparator:
         primary_stem_path, secondary_stem_path = self.separator.separate(audio_path)
         end_time = time.time()
         print(f'Separation took {end_time - start_time:.2f} seconds')
-        return primary_stem_path, secondary_stem_path
+        return os.path.abspath(os.path.join(self.output_dir, primary_stem_path)), os.path.abspath(os.path.join(self.output_dir, secondary_stem_path))
 
 
 if __name__ == '__main__':
