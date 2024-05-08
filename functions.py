@@ -14,7 +14,7 @@ api_key = secrets["lip_api_key"]
 rvc_path = "venv/src/rvclib"
 model_path = "models/denvot.pth"
 
-image_path = 'images/big_pups.png'
+file_path = 'images/big_pups.png'
 rvc_pitch = 6
 
 text2lip = Text2RVCLipSync(lip_api_key=api_key, rvc_path=rvc_path, model_path=model_path, lip_crop=True)
@@ -77,4 +77,4 @@ def youtube_remix(video_url):
     return output_video_path
 
 def tts_lip(text):
-    return text2lip(text=text, image_path=image_path, rvc_pitch=rvc_pitch)
+    return text2lip(text=text, file_path=file_path, rvc_pitch=rvc_pitch)
