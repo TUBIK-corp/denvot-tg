@@ -31,11 +31,15 @@ def set_volume(value):
     default_volumem = value
 
 
-def video_file_remix(video_path, pitch=rvc_pitch):
-    return voice_video(video_path, pitch=pitch)
+def audio_file_remix(audio_path, pitch=rvc_pitch, use_separator=True):
+    return voice_audio(audio_path, pitch=pitch, use_separator=use_separator)
 
 
-def youtube_remix(video_url, pitch=rvc_pitch):
+def video_file_remix(video_path, pitch=rvc_pitch, use_separator=True):
+    return voice_video(video_path, pitch=pitch, use_separator=use_separator)
+
+
+def youtube_remix(video_url, pitch=rvc_pitch, use_separator=True):
     global separator
     video_path = tempfile.mktemp(suffix=".mp4")
     folder, file_name = os.path.split(video_path)
@@ -59,7 +63,68 @@ def youtube_remix(video_url, pitch=rvc_pitch):
         
     video.download(output_path=folder, filename=file_name)
     print("Downloaded video: ", video_path)
-    return voice_video(video_path, pitch=pitch)
+    return voice_video(video_path, pitch=pitch, use_separator=use_separator)
+
+
+def voice_audio(audio_path, pitch, audio_chunks=False, use_separator=True, vocal_volume=default_volumem):
+    global separator
+    audio = AudioFileClip(audio_path)
+
+    if use_separator:
+
+        primary_stem_path, secondary_stem_path = separator(audio_path)
+
+        vocal_audio = primary_stem_path
+        instrumental_audio = secondary_stem_path
+
+    
+
+    if audio_chunks is True:
+        if use_separator: audio = AudioFileClip(vocal_audio)
+
+        chunk_duration = 20
+        audio_chunks = []
+        total_duration = audio.duration
+        start_time = 0
+
+        while start_time < total_duration:
+            end_time = min(start_time + chunk_duration, total_duration)
+            chunk = audio.subclip(start_time, end_time)
+            chunk_path = tempfile.mktemp(suffix=".mp3")
+            chunk.write_audiofile(chunk_path, fps=44100)
+            audio_chunks.append(chunk_path)
+            start_time += chunk_duration
+
+        processed_sound_paths = []
+
+
+        for chunk_path in audio_chunks:
+            sound_path = text2lip.rvc.speech(pitch=pitch, input_path=chunk_path, output_directory=tempfile.gettempdir())
+            processed_sound_paths.append(sound_path)
+            os.remove(chunk_path)
+
+        final_sound = concatenate_audioclips([AudioFileClip(sound_path) for sound_path in processed_sound_paths])
+
+        final_path = tempfile.mktemp(suffix=".wav")
+        final_sound.write_audiofile(final_path, fps=44100)
+
+        audio = AudioFileClip(final_path).volumex(vocal_volume)
+    else:
+        final_path = text2lip.rvc.speech(pitch=pitch, input_path=audio_path, output_directory=tempfile.gettempdir())
+        audio = AudioFileClip(final_path).volumex(vocal_volume)
+
+    
+    if use_separator:
+
+        audio = audio.volumex(1.5)
+        instrumental_audio_clip = AudioFileClip(instrumental_audio)
+        merged_audio = CompositeAudioClip([audio, instrumental_audio_clip])
+    else:
+        merged_audio = audio
+    
+    audio_path = tempfile.mktemp(suffix=".mp3")
+    merged_audio.write_audiofile(audio_path, fps=44100)
+    return audio_path
 
 
 
@@ -67,9 +132,9 @@ def voice_video(video_path, pitch, video_chunks=False, use_separator=True, vocal
     video_clip = VideoFileClip(video_path)
     audio = video_clip.audio
 
+    audio_path = tempfile.mktemp(suffix=".mp3")
+    audio.write_audiofile(audio_path, fps=44100)
     if use_separator:
-        audio_path = tempfile.mktemp(suffix=".mp3")
-        audio.write_audiofile(audio_path, fps=44100)
 
         primary_stem_path, secondary_stem_path = separator(audio_path)
 
@@ -109,17 +174,17 @@ def voice_video(video_path, pitch, video_chunks=False, use_separator=True, vocal
 
         audio = AudioFileClip(final_path).volumex(vocal_volume)
     else:
-        final_path = text2lip.rvc.speech(pitch=pitch, input_path=vocal_audio, output_directory=tempfile.gettempdir())
+        final_path = text2lip.rvc.speech(pitch=pitch, input_path=audio_path, output_directory=tempfile.gettempdir())
         audio = AudioFileClip(final_path).volumex(vocal_volume)
 
     if use_separator:
 
-        audio = audio.volumex(vocal_volume)
+        audio = audio.volumex(1.5)
         instrumental_audio_clip = AudioFileClip(instrumental_audio)
         merged_audio = CompositeAudioClip([audio, instrumental_audio_clip])
         final_clip = video_clip.set_audio(merged_audio)
     else:
-        final_clip = video_clip.set_audio(final_sound)
+        final_clip = video_clip.set_audio(audio)
 
     output_video_path = tempfile.mktemp(suffix=".mp4")
     final_clip.write_videofile(output_video_path, codec="libx264", audio_codec="aac", fps=30)
