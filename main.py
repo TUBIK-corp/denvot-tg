@@ -16,6 +16,7 @@ bot = telebot.TeleBot(tg_api)
 
 request_queue = Queue()
 
+use_chunks = False
 
 @bot.message_handler(commands=['start'])
 def start(message):
@@ -57,24 +58,24 @@ def callback_inline(call):
         bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text="Выберите способ переозвучки видео:", reply_markup=markup)
     elif call.data == "youtube_cover":
         bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text="Скиньте ссылку на видео для озвучки!")
-        bot.register_next_step_handler(call.message, get_youtube_link, True)
+        bot.register_next_step_handler(call.message, get_youtube_link, True, use_chunks)
     elif call.data == "file_cover":
         bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text="Пришлите видеофайл для озвучки!")
-        bot.register_next_step_handler(call.message, get_video_file, True)
+        bot.register_next_step_handler(call.message, get_video_file, True, use_chunks)
     elif call.data == "youtube_voiceover":
         bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text="Скиньте ссылку на видео для озвучки!")
-        bot.register_next_step_handler(call.message, get_youtube_link, False)
+        bot.register_next_step_handler(call.message, get_youtube_link, False, use_chunks)
     elif call.data == "file_voiceover":
         bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text="Пришлите видеофайл для озвучки!")
-        bot.register_next_step_handler(call.message, get_video_file, False)
+        bot.register_next_step_handler(call.message, get_video_file, False, use_chunks)
     elif call.data == "audio_cover":
-        bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text="Пришлите аудиоофайл для озвучки!")
-        bot.register_next_step_handler(call.message, get_audio_file, True)
+        bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text="Пришлите аудиофайл для озвучки!")
+        bot.register_next_step_handler(call.message, get_audio_file, True, use_chunks)
     elif call.data == "audio_voiceover":
-        bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text="Пришлите аудиоофайл для озвучки!")
-        bot.register_next_step_handler(call.message, get_audio_file, False)
+        bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text="Пришлите аудиофайл для озвучки!")
+        bot.register_next_step_handler(call.message, get_audio_file, False, use_chunks)
 
-def get_audio_file(message, use_separator=True):
+def get_audio_file(message, use_separator=True, video_chunks=False):
     if message.text == "/start":
         start()
         return
@@ -85,9 +86,9 @@ def get_audio_file(message, use_separator=True):
     file_id = audio_file.file_id
     file_info = bot.get_file(file_id)
     bot.send_message(message.chat.id, "Введите pitch (целое число):")
-    bot.register_next_step_handler(message, start_audio_file, file_info.file_path, use_separator)
+    bot.register_next_step_handler(message, start_audio_file, file_info.file_path, use_separator, video_chunks)
 
-def get_video_file(message, use_separator=True):
+def get_video_file(message, use_separator=True, video_chunks=False):
     if message.text == "/start":
         start()
         return
@@ -98,10 +99,10 @@ def get_video_file(message, use_separator=True):
     file_id = video_file.file_id
     file_info = bot.get_file(file_id)
     bot.send_message(message.chat.id, "Введите pitch (целое число):")
-    bot.register_next_step_handler(message, start_video_file, file_info.file_path, use_separator)
+    bot.register_next_step_handler(message, start_video_file, file_info.file_path, use_separator, video_chunks)
 
 
-def start_audio_file(message, file_info, use_separator=True):
+def start_audio_file(message, file_info, use_separator=True, video_chunks=False):
     if message.text == "/start":
         start(message)
         return
@@ -112,10 +113,10 @@ def start_audio_file(message, file_info, use_separator=True):
     with open(temp_video_path, 'wb') as temp_file:
             temp_file.write(response.content)
 
-    request_queue.put((message, 'audio-file-remix', temp_video_path, pitch, use_separator))
+    request_queue.put((message, 'audio-file-remix', temp_video_path, pitch, use_separator, video_chunks))
     bot.reply_to(message, "Отправил аудио в очередь на озвучку 😉")
 
-def start_video_file(message, file_info, use_separator=True):
+def start_video_file(message, file_info, use_separator=True, video_chunks=False):
     if message.text == "/start":
         start(message)
         return
@@ -126,23 +127,23 @@ def start_video_file(message, file_info, use_separator=True):
     with open(temp_video_path, 'wb') as temp_file:
             temp_file.write(response.content)
 
-    request_queue.put((message, 'video-file-remix', temp_video_path, pitch, use_separator))
+    request_queue.put((message, 'video-file-remix', temp_video_path, pitch, use_separator, video_chunks))
     bot.reply_to(message, "Отправил видео в очередь на озвучку 😉")
 
-def get_youtube_link(message, use_separator=True):
+def get_youtube_link(message, use_separator=True, video_chunks=False):
     if message.text == "/start":
         start(message)
         return
     video_link = message.text
     bot.send_message(message.chat.id, "Введите pitch (целое число):")
-    bot.register_next_step_handler(message, start_youtube_remix, video_link, use_separator)
+    bot.register_next_step_handler(message, start_youtube_remix, video_link, use_separator, video_chunks)
 
-def start_youtube_remix(message, video_link, use_separator=True):
+def start_youtube_remix(message, video_link, use_separator=True, video_chunks=False):
     if message.text == "/start":
         start(message)
         return
     pitch = int(message.text)
-    request_queue.put((message, 'youtube-remix', video_link, pitch, use_separator))
+    request_queue.put((message, 'youtube-remix', video_link, pitch, use_separator, video_chunks))
     bot.reply_to(message, "Отправил видео в очередь на озвучку 😉")
 
 def start_tts_lip(message):
@@ -155,24 +156,24 @@ def start_tts_lip(message):
 
 def execute_requests():
     while True:
-        message, command_type, content, pitch, use_separator = request_queue.get()
+        message, command_type, content, pitch, use_separator, chunks = request_queue.get()
         if command_type == 'youtube-remix':
             try:
-                video_location = youtube_remix(content, pitch=pitch, use_separator=use_separator)
+                video_location = youtube_remix(content, pitch=pitch, use_separator=use_separator, video_chunks=chunks)
                 with open(video_location, 'rb') as video_file:
                     bot.send_video(message.chat.id, video_file)
             except Exception as e:
                 bot.reply_to(message, f"Ошибка: {e}")
         elif command_type == 'video-file-remix':
             try:
-                video_location = video_file_remix(content, pitch=pitch, use_separator=use_separator)
+                video_location = video_file_remix(content, pitch=pitch, use_separator=use_separator, video_chunks=chunks)
                 with open(video_location, 'rb') as video_file:
                     bot.send_video(message.chat.id, video_file)
             except Exception as e:
                 bot.reply_to(message, f"Ошибка: {e}")
         elif command_type == 'audio-file-remix':
             try:
-                audio_location = audio_file_remix(content, pitch=pitch, use_separator=use_separator)
+                audio_location = audio_file_remix(content, pitch=pitch, use_separator=use_separator, audio_chunks=chunks)
                 with open(audio_location, 'rb') as audio_file:
                     bot.send_audio(message.chat.id, audio_file)
             except Exception as e:

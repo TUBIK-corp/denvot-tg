@@ -31,15 +31,15 @@ def set_volume(value):
     default_volumem = value
 
 
-def audio_file_remix(audio_path, pitch=rvc_pitch, use_separator=True):
-    return voice_audio(audio_path, pitch=pitch, use_separator=use_separator)
+def audio_file_remix(audio_path, pitch=rvc_pitch, use_separator=True, audio_chunks=False):
+    return voice_audio(audio_path, pitch=pitch, use_separator=use_separator, audio_chunks=audio_chunks)
 
 
-def video_file_remix(video_path, pitch=rvc_pitch, use_separator=True):
-    return voice_video(video_path, pitch=pitch, use_separator=use_separator)
+def video_file_remix(video_path, pitch=rvc_pitch, use_separator=True, video_chunks=False):
+    return voice_video(video_path, pitch=pitch, use_separator=use_separator, video_chunks=video_chunks)
 
 
-def youtube_remix(video_url, pitch=rvc_pitch, use_separator=True):
+def youtube_remix(video_url, pitch=rvc_pitch, use_separator=True, video_chunks=False):
     global separator
     video_path = tempfile.mktemp(suffix=".mp4")
     folder, file_name = os.path.split(video_path)
@@ -63,7 +63,7 @@ def youtube_remix(video_url, pitch=rvc_pitch, use_separator=True):
         
     video.download(output_path=folder, filename=file_name)
     print("Downloaded video: ", video_path)
-    return voice_video(video_path, pitch=pitch, use_separator=use_separator)
+    return voice_video(video_path, pitch=pitch, use_separator=use_separator, video_chunks=video_chunks)
 
 
 def voice_audio(audio_path, pitch, audio_chunks=False, use_separator=True, vocal_volume=default_volumem):
