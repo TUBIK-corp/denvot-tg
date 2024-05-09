@@ -159,7 +159,6 @@ def execute_requests():
         if command_type == 'youtube-remix':
             try:
                 video_location = youtube_remix(content, pitch=pitch, use_separator=use_separator)
-                bot.reply_to(message, "Ваш файл готов 😊")
                 with open(video_location, 'rb') as video_file:
                     bot.send_video(message.chat.id, video_file)
             except Exception as e:
@@ -167,7 +166,6 @@ def execute_requests():
         elif command_type == 'video-file-remix':
             try:
                 video_location = video_file_remix(content, pitch=pitch, use_separator=use_separator)
-                bot.reply_to(message, "Ваш файл готов 😊")
                 with open(video_location, 'rb') as video_file:
                     bot.send_video(message.chat.id, video_file)
             except Exception as e:
@@ -175,7 +173,6 @@ def execute_requests():
         elif command_type == 'audio-file-remix':
             try:
                 audio_location = audio_file_remix(content, pitch=pitch, use_separator=use_separator)
-                bot.reply_to(message, "Ваш файл готов 😊")
                 with open(audio_location, 'rb') as audio_file:
                     bot.send_audio(message.chat.id, audio_file)
             except Exception as e:
@@ -183,7 +180,6 @@ def execute_requests():
         elif command_type == 'tts-lip':
             try:
                 video_location = tts_lip(content)
-                bot.reply_to(message, "Ваш файл готов 😊")
                 with open(video_location, 'rb') as video_file:
                     bot.send_video(message.chat.id, video_file)
             except Exception as e:
