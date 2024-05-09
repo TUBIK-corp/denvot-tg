@@ -4,8 +4,11 @@ import json
 import tempfile
 import os
 from pytube import YouTube
+from pydub import AudioSegment
+import numpy as np
 from audio import AudioSeparator
 from pytube.exceptions import RegexMatchError
+import librosa
 
 # Загрузка ключа API и создание экземпляра Text2RVCLipSync
 with open('secrets.json', 'r') as f:
@@ -53,7 +56,15 @@ def youtube_remix(video_url, pitch=rvc_pitch):
     return voice_video(video_path, pitch=pitch)
 
 
-def voice_video(video_path, pitch, video_chunks=False, vocal_volume=3):
+def calculate_average_volume(audio_file):
+    audio = AudioSegment.from_file(audio_file)
+    samples = np.array(audio.get_array_of_samples())
+    rms = np.sqrt(np.mean(samples**2))
+    average_volume_db = 20 * np.log10(rms) if rms > 0 else -float('inf')
+
+    return average_volume_db
+
+def voice_video(video_path, pitch, video_chunks=False, vocal_volume=2.75):
     video_clip = VideoFileClip(video_path)
     audio = video_clip.audio
     audio_path = tempfile.mktemp(suffix=".mp3")
@@ -97,7 +108,18 @@ def voice_video(video_path, pitch, video_chunks=False, vocal_volume=3):
 
         audio = AudioFileClip(final_path).volumex(vocal_volume)
     else:
-        audio = AudioFileClip(text2lip.rvc.speech(pitch=pitch, input_path=vocal_audio, output_directory=tempfile.gettempdir())).volumex(vocal_volume)
+        final_path = text2lip.rvc.speech(pitch=pitch, input_path=vocal_audio, output_directory=tempfile.gettempdir())
+        audio = AudioFileClip(final_path).volumex(vocal_volume)
+
+
+    average_vocal_volume = calculate_average_volume(final_path)
+    average_inst_volume = calculate_average_volume(instrumental_audio)
+
+    print("Vocal vu:", round(average_vocal_volume, 1), "Db.")
+
+    print("Instrumental vu:", round(average_inst_volume, 1), "Db.")
+
+    audio = audio.volumex(round(average_inst_volume/average_vocal_volume, 1)*vocal_volume)
 
     instrumental_audio_clip = AudioFileClip(instrumental_audio)
 
