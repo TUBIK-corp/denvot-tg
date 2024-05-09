@@ -20,9 +20,13 @@ rvc_pitch = 6
 
 text2lip = Text2RVCLipSync(lip_api_key=api_key, rvc_path=rvc_path, model_path=model_path, lip_crop=True)
 
-separator = AudioSeparator()
+separator = AudioSeparator(model_name="UVR-MDX-NET-Inst_HQ_3")
 
-def youtube_remix(video_url):
+def video_file_remix(video_path, pitch=rvc_pitch):
+    return voice_video(video_path, pitch=pitch)
+
+
+def youtube_remix(video_url, pitch=rvc_pitch):
     global separator
     video_path = tempfile.mktemp(suffix=".mp4")
     folder, file_name = os.path.split(video_path)
@@ -46,7 +50,10 @@ def youtube_remix(video_url):
         
     video.download(output_path=folder, filename=file_name)
     print("Downloaded video: ", video_path)
+    return voice_video(video_path, pitch=pitch)
 
+
+def voice_video(video_path, pitch, video_chunks=False, vocal_volume=3):
     video_clip = VideoFileClip(video_path)
     audio = video_clip.audio
     audio_path = tempfile.mktemp(suffix=".mp3")
@@ -57,35 +64,44 @@ def youtube_remix(video_url):
     vocal_audio = primary_stem_path
     instrumental_audio = secondary_stem_path
 
-    audio = AudioFileClip(vocal_audio)
+    
 
-    chunk_duration = 30
-    audio_chunks = []
-    total_duration = audio.duration
-    start_time = 0
+    if video_chunks is True:
+        audio = AudioFileClip(vocal_audio)
 
-    while start_time < total_duration:
-        end_time = min(start_time + chunk_duration, total_duration)
-        chunk = audio.subclip(start_time, end_time)
-        chunk_path = tempfile.mktemp(suffix=".mp3")
-        chunk.write_audiofile(chunk_path, fps=44100)
-        audio_chunks.append(chunk_path)
-        start_time += chunk_duration
+        chunk_duration = 30
+        audio_chunks = []
+        total_duration = audio.duration
+        start_time = 0
 
-    processed_sound_paths = []
+        while start_time < total_duration:
+            end_time = min(start_time + chunk_duration, total_duration)
+            chunk = audio.subclip(start_time, end_time)
+            chunk_path = tempfile.mktemp(suffix=".mp3")
+            chunk.write_audiofile(chunk_path, fps=44100)
+            audio_chunks.append(chunk_path)
+            start_time += chunk_duration
+
+        processed_sound_paths = []
 
 
-    for chunk_path in audio_chunks:
-        sound_path = text2lip.rvc.speech(pitch=rvc_pitch, input_path=chunk_path, output_directory=tempfile.gettempdir())
-        processed_sound_paths.append(sound_path)
-        os.remove(chunk_path)
+        for chunk_path in audio_chunks:
+            sound_path = text2lip.rvc.speech(pitch=pitch, input_path=chunk_path, output_directory=tempfile.gettempdir())
+            processed_sound_paths.append(sound_path)
+            os.remove(chunk_path)
 
-    final_sound = concatenate_audioclips([AudioFileClip(sound_path) for sound_path in processed_sound_paths])
-    final_sound.gain = 20
+        final_sound = concatenate_audioclips([AudioFileClip(sound_path) for sound_path in processed_sound_paths])
+
+        final_path = tempfile.mktemp(suffix=".wav")
+        final_sound.write_audiofile(final_path, fps=44100)
+
+        audio = AudioFileClip(final_path).volumex(vocal_volume)
+    else:
+        audio = AudioFileClip(text2lip.rvc.speech(pitch=pitch, input_path=vocal_audio, output_directory=tempfile.gettempdir())).volumex(vocal_volume)
 
     instrumental_audio_clip = AudioFileClip(instrumental_audio)
 
-    merged_audio = CompositeAudioClip([final_sound, instrumental_audio_clip])
+    merged_audio = CompositeAudioClip([audio, instrumental_audio_clip])
 
     final_clip = video_clip.set_audio(merged_audio)
 

@@ -1,9 +1,11 @@
 import telebot
 from telebot import types
-from functions import youtube_remix, tts_lip
+from functions import youtube_remix, tts_lip, video_file_remix
 from threading import Thread
 from queue import Queue
 import config
+import requests
+import tempfile
 from tts_with_rvc_with_lipsync import Text2RVCLipSync
 
 
@@ -12,70 +14,87 @@ bot = telebot.TeleBot(config.tg_api)
 request_queue = Queue()
 
 @bot.message_handler(commands=['start'])
-def handle_start(message):
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    item1 = types.KeyboardButton("Кружок")
-    item2 = types.KeyboardButton("AI Cover")
-    markup.add(item1, item2)
-    bot.send_message(message.chat.id, "Привет! Я бот, который делает озвучку прямо в Telegram!", reply_markup=markup)
+def start(message):
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    btn1 = types.InlineKeyboardButton("Кружок", callback_data="kruzhok")
+    btn2 = types.InlineKeyboardButton("AI Cover", callback_data="ai_cover")
+    markup.add(btn1, btn2)
+    bot.send_message(message.chat.id, "Привет я бот, по имени ДенВот! Я умею делать озвучку прямо в телеграмме! Выбор:", reply_markup=markup)
 
-# Обработчик выбора "Кружок"
-@bot.message_handler(func=lambda message: message.text == "Кружок")
-def handle_circle(message):
-    bot.send_message(message.chat.id, "Введите текст для кружка!")
-    bot.register_next_step_handler(message, start_tts_lip)
-
-# Обработчик выбора "AI Cover"
-@bot.message_handler(func=lambda message: message.text == "AI Cover")
-def handle_ai_cover(message):
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    item1 = types.KeyboardButton("Аудио")
-    item2 = types.KeyboardButton("Видео")
-    markup.add(item1, item2)
-    bot.send_message(message.chat.id, "Выберите способ создания кавера!", reply_markup=markup)
-
-# Обработчик выбора "Аудио"
-@bot.message_handler(func=lambda message: message.text == "Аудио")
-def handle_audio(message):
-    bot.send_message(message.chat.id, "Отправьте аудио для озвучки!")
-    bot.register_next_step_handler(message, start_tts_lip)
-
-# Обработчик выбора "Видео"
-@bot.message_handler(func=lambda message: message.text == "Видео")
-def handle_video(message):
-    markup = types.InlineKeyboardMarkup()
-    item1 = types.InlineKeyboardButton("YouTube", callback_data='youtube')
-    item2 = types.InlineKeyboardButton("Файл", callback_data='file')
-    markup.add(item1, item2)
-    bot.send_message(message.chat.id, "Выберите способ озвучки видео:", reply_markup=markup)
-
-# Обработчик нажатий на кнопки inline
 @bot.callback_query_handler(func=lambda call: True)
-def handle_inline_buttons(call):
-    if call.data == 'youtube':
-        bot.send_message(call.message.chat.id, "Введите ссылку на YouTube видео!")
-        bot.register_next_step_handler(call.message, start_youtube_remix)
-    elif call.data == 'file':
-        bot.send_message(call.message.chat.id, "Отправьте видеофайл для обработки!")
-        # Добавьте обработчик для обработки файла
+def callback_inline(call):
+    if call.data == "kruzhok":
+        bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text="Наберите текст для кружка!")
+        bot.register_next_step_handler(call.message, start_tts_lip)
+    elif call.data == "ai_cover":
+        markup = types.InlineKeyboardMarkup(row_width=2)
+        btn1 = types.InlineKeyboardButton("Видео", callback_data="video")
+        btn2 = types.InlineKeyboardButton("Аудио", callback_data="audio")
+        markup.add(btn1, btn2)
+        bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text="Выберите способ создания кавера!", reply_markup=markup)
+    elif call.data == "video":
+        markup = types.InlineKeyboardMarkup(row_width=2)
+        btn1 = types.InlineKeyboardButton("YouTube", callback_data="youtube")
+        btn2 = types.InlineKeyboardButton("Файл", callback_data="file")
+        markup.add(btn1, btn2)
+        bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text="Выберите способ озвучки видео:", reply_markup=markup)
+    elif call.data == "youtube":
+        bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text="Скиньте ссылку на видео для озвучки!")
+        bot.register_next_step_handler(call.message, get_youtube_link)
+    elif call.data == "file":
+        bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text="Пришлите видеофайл для озвучки!")
+        bot.register_next_step_handler(call.message, get_video_file)
 
-def start_youtube_remix(message):
-    print(message.text)
+def get_video_file(message):
+    video_file = message.video
+    if (video_file.file_size/1024/1024) > 20:
+        bot.send_message(message.chat.id, "Файл занимает слишком много: " + str(round(video_file.file_size/1024/1024, 2)) + " \nMB. Попробуйте сжать его через сервис: https://www.freeconvert.com/video-compressor")
+        return
+    file_id = video_file.file_id
+    file_info = bot.get_file(file_id)
+    bot.send_message(message.chat.id, "Введите pitch (целое число):")
+    bot.register_next_step_handler(message, start_video_file_remix, file_info.file_path)
+
+def start_video_file_remix(message, file_info):
+    pitch = int(message.text)
+    url = f"https://api.telegram.org/file/bot{config.tg_api}/{file_info}"
+    response = requests.get(url)
+    temp_video_path = tempfile.mktemp(suffix=".mp4")
+    with open(temp_video_path, 'wb') as temp_file:
+            temp_file.write(response.content)
+
+    request_queue.put((message, 'video-file-remix', temp_video_path, pitch))
+    bot.reply_to(message, "Отправил видео в очередь на озвучку 😉")
+
+def get_youtube_link(message):
     video_link = message.text
-    request_queue.put((message, 'youtube-remix', video_link))
+    bot.send_message(message.chat.id, "Введите pitch (целое число):")
+    bot.register_next_step_handler(message, start_youtube_remix, video_link)
+
+def start_youtube_remix(message, video_link):
+    pitch = int(message.text)
+    request_queue.put((message, 'youtube-remix', video_link, pitch))
     bot.reply_to(message, "Отправил видео в очередь на озвучку 😉")
 
 def start_tts_lip(message):
     text = message.text
-    request_queue.put((message, 'tts-lip', text))
+    request_queue.put((message, 'tts-lip', text, 0))
     bot.reply_to(message, "Отправил текст в очередь на озвучку 😉")
 
 def execute_requests():
     while True:
-        message, command_type, content = request_queue.get()
+        message, command_type, content, pitch = request_queue.get()
         if command_type == 'youtube-remix':
             try:
-                video_location = youtube_remix(content)
+                video_location = youtube_remix(content, pitch=pitch)
+                bot.reply_to(message, "Ваш файл готов 😊")
+                with open(video_location, 'rb') as video_file:
+                    bot.send_video(message.chat.id, video_file)
+            except Exception as e:
+                bot.reply_to(message, f"Ошибка: {e}")
+        elif command_type == 'video-file-remix':
+            try:
+                video_location = video_file_remix(content, pitch)
                 bot.reply_to(message, "Ваш файл готов 😊")
                 with open(video_location, 'rb') as video_file:
                     bot.send_video(message.chat.id, video_file)
