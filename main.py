@@ -3,13 +3,16 @@ from telebot import types
 from functions import youtube_remix, tts_lip, video_file_remix
 from threading import Thread
 from queue import Queue
-import config
 import requests
 import tempfile
 from tts_with_rvc_with_lipsync import Text2RVCLipSync
+import json
 
+with open('secrets.json', 'r') as f:
+    secrets = json.load(f)
 
-bot = telebot.TeleBot(config.tg_api)
+tg_api = secrets["tg_api"]
+bot = telebot.TeleBot(tg_api)
 
 request_queue = Queue()
 
@@ -57,7 +60,7 @@ def get_video_file(message):
 
 def start_video_file_remix(message, file_info):
     pitch = int(message.text)
-    url = f"https://api.telegram.org/file/bot{config.tg_api}/{file_info}"
+    url = f"https://api.telegram.org/file/bot{tg_api}/{file_info}"
     response = requests.get(url)
     temp_video_path = tempfile.mktemp(suffix=".mp4")
     with open(temp_video_path, 'wb') as temp_file:
@@ -114,6 +117,7 @@ def main():
 
     try:
         Thread(target=execute_requests, daemon=True).start()
+        print("DenVot-TG launched!")
         bot.infinity_polling()
     except:
         print("ok")

@@ -64,23 +64,25 @@ def calculate_average_volume(audio_file):
 
     return average_volume_db
 
-def voice_video(video_path, pitch, video_chunks=False, vocal_volume=2.75):
+def voice_video(video_path, pitch, video_chunks=False, use_separator=True, vocal_volume=2.75):
     video_clip = VideoFileClip(video_path)
     audio = video_clip.audio
-    audio_path = tempfile.mktemp(suffix=".mp3")
-    audio.write_audiofile(audio_path, fps=44100)
 
-    primary_stem_path, secondary_stem_path = separator(audio_path)
+    if use_separator:
+        audio_path = tempfile.mktemp(suffix=".mp3")
+        audio.write_audiofile(audio_path, fps=44100)
 
-    vocal_audio = primary_stem_path
-    instrumental_audio = secondary_stem_path
+        primary_stem_path, secondary_stem_path = separator(audio_path)
+
+        vocal_audio = primary_stem_path
+        instrumental_audio = secondary_stem_path
 
     
 
     if video_chunks is True:
-        audio = AudioFileClip(vocal_audio)
+        if use_separator: audio = AudioFileClip(vocal_audio)
 
-        chunk_duration = 30
+        chunk_duration = 20
         audio_chunks = []
         total_duration = audio.duration
         start_time = 0
@@ -111,21 +113,20 @@ def voice_video(video_path, pitch, video_chunks=False, vocal_volume=2.75):
         final_path = text2lip.rvc.speech(pitch=pitch, input_path=vocal_audio, output_directory=tempfile.gettempdir())
         audio = AudioFileClip(final_path).volumex(vocal_volume)
 
+    if use_separator:
+        average_vocal_volume = calculate_average_volume(final_path)
+        average_inst_volume = calculate_average_volume(instrumental_audio)
 
-    average_vocal_volume = calculate_average_volume(final_path)
-    average_inst_volume = calculate_average_volume(instrumental_audio)
+        print("Vocal vu:", round(average_vocal_volume, 1), "Db.")
 
-    print("Vocal vu:", round(average_vocal_volume, 1), "Db.")
+        print("Instrumental vu:", round(average_inst_volume, 1), "Db.")
 
-    print("Instrumental vu:", round(average_inst_volume, 1), "Db.")
-
-    audio = audio.volumex(round(average_inst_volume/average_vocal_volume, 1)*vocal_volume)
-
-    instrumental_audio_clip = AudioFileClip(instrumental_audio)
-
-    merged_audio = CompositeAudioClip([audio, instrumental_audio_clip])
-
-    final_clip = video_clip.set_audio(merged_audio)
+        audio = audio.volumex(round(average_inst_volume/average_vocal_volume, 1)*vocal_volume)
+        instrumental_audio_clip = AudioFileClip(instrumental_audio)
+        merged_audio = CompositeAudioClip([audio, instrumental_audio_clip])
+        final_clip = video_clip.set_audio(merged_audio)
+    else:
+        final_clip = video_clip.set_audio(final_sound)
 
     output_video_path = tempfile.mktemp(suffix=".mp4")
     final_clip.write_videofile(output_video_path, codec="libx264", audio_codec="aac", fps=30)
