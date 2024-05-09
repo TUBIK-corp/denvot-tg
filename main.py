@@ -16,6 +16,7 @@ bot = telebot.TeleBot(tg_api)
 
 request_queue = Queue()
 
+
 @bot.message_handler(commands=['start'])
 def start(message):
     markup = types.InlineKeyboardMarkup(row_width=2)

@@ -25,6 +25,12 @@ text2lip = Text2RVCLipSync(lip_api_key=api_key, rvc_path=rvc_path, model_path=mo
 
 separator = AudioSeparator(model_name="UVR-MDX-NET-Inst_HQ_3")
 
+default_volumem = 2
+
+def set_volume(value):
+    default_volumem = value
+
+
 def video_file_remix(video_path, pitch=rvc_pitch):
     return voice_video(video_path, pitch=pitch)
 
@@ -56,15 +62,8 @@ def youtube_remix(video_url, pitch=rvc_pitch):
     return voice_video(video_path, pitch=pitch)
 
 
-def calculate_average_volume(audio_file):
-    audio = AudioSegment.from_file(audio_file)
-    samples = np.array(audio.get_array_of_samples())
-    rms = np.sqrt(np.mean(samples**2))
-    average_volume_db = 20 * np.log10(rms) if rms > 0 else -float('inf')
 
-    return average_volume_db
-
-def voice_video(video_path, pitch, video_chunks=False, use_separator=True, vocal_volume=2.75):
+def voice_video(video_path, pitch, video_chunks=False, use_separator=True, vocal_volume=default_volumem):
     video_clip = VideoFileClip(video_path)
     audio = video_clip.audio
 
@@ -114,14 +113,8 @@ def voice_video(video_path, pitch, video_chunks=False, use_separator=True, vocal
         audio = AudioFileClip(final_path).volumex(vocal_volume)
 
     if use_separator:
-        average_vocal_volume = calculate_average_volume(final_path)
-        average_inst_volume = calculate_average_volume(instrumental_audio)
 
-        print("Vocal vu:", round(average_vocal_volume, 1), "Db.")
-
-        print("Instrumental vu:", round(average_inst_volume, 1), "Db.")
-
-        audio = audio.volumex(round(average_inst_volume/average_vocal_volume, 1)*vocal_volume)
+        audio = audio.volumex(vocal_volume)
         instrumental_audio_clip = AudioFileClip(instrumental_audio)
         merged_audio = CompositeAudioClip([audio, instrumental_audio_clip])
         final_clip = video_clip.set_audio(merged_audio)
