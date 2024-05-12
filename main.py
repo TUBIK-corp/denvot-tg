@@ -1,6 +1,6 @@
 import telebot
 from telebot import types
-from functions import youtube_remix, tts_lip, video_file_remix, audio_file_remix
+from functions import youtube_remix, tts_lip, video_file_remix, audio_file_remix, set_model, set_face
 from threading import Thread
 from queue import Queue
 import requests
@@ -27,11 +27,23 @@ def start(message):
     markup.add(btn1, btn2, btn3)
     bot.send_message(message.chat.id, "Привет я бот, по имени ДенВот! Я умею делать озвучку прямо в телеграмме! Выбор:", reply_markup=markup)
 
+@bot.message_handler(commands=['setmodel'])
+def settings(message):
+    text = message.text.split(' ', 1)[1]
+    set_model(text.split()[0])
+    bot.send_message(message.chat.id, f"Настройки изменены!\nГолосовая модель: {text.split()[0]}")
+
+@bot.message_handler(commands=['setface'])
+def settings(message):
+    text = message.text.split(' ', 1)[1]
+    set_face(text.split()[0])
+    bot.send_message(message.chat.id, f"Настройки изменены!\nИзображение: {text.split()[0]}")
+
 @bot.callback_query_handler(func=lambda call: True)
 def callback_inline(call):
     if call.data == "kruzhok":
         bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text="Наберите текст для кружка!")
-        bot.register_next_step_handler(call.message, start_tts_lip)
+        bot.register_next_step_handler(call.message, get_tts_lip)
     elif call.data == "ai_cover":
         markup = types.InlineKeyboardMarkup(row_width=2)
         btn1 = types.InlineKeyboardButton("Видео", callback_data="video_cover")
@@ -146,12 +158,20 @@ def start_youtube_remix(message, video_link, use_separator=True, video_chunks=Fa
     request_queue.put((message, 'youtube-remix', video_link, pitch, use_separator, video_chunks))
     bot.reply_to(message, "Отправил видео в очередь на озвучку 😉")
 
-def start_tts_lip(message):
+def get_tts_lip(message):
     if message.text == "/start":
         start(message)
         return
     text = message.text
-    request_queue.put((message, 'tts-lip', text, 6, False))
+    bot.send_message(message.chat.id, "Введите pitch (целое число):")
+    bot.register_next_step_handler(message, start_tts_lip, text)
+
+def start_tts_lip(message, text):
+    if message.text == "/start":
+        start(message)
+        return
+    pitch = int(message.text)
+    request_queue.put((message, 'tts-lip', text, pitch, False, False))
     bot.reply_to(message, "Отправил текст в очередь на озвучку 😉")
 
 def execute_requests():

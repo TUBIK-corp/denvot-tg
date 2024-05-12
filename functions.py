@@ -16,16 +16,28 @@ with open('secrets.json', 'r') as f:
 
 api_key = secrets["lip_api_key"]
 rvc_path = "src/rvclib"
-model_path = "models/denvot.pth"
-
-file_path = 'images/big_pups.png'
+model_path = "models/"
+model = "denvot.pth"
+file_path = "images/"
+face = "big_pups.png"
 rvc_pitch = 6
 
-text2lip = Text2RVCLipSync(lip_api_key=api_key, rvc_path=rvc_path, model_path=model_path, lip_crop=True)
+path2model = model_path + model
+text2lip = Text2RVCLipSync(lip_api_key=api_key, rvc_path=rvc_path, model_path=path2model, lip_crop=True)
 
 separator = AudioSeparator(model_name="UVR-MDX-NET-Inst_HQ_3")
 
 default_volumem = 2
+
+def set_model(new_model):
+    global model, text2lip
+    model = new_model
+    path2model = model_path + model
+    text2lip = Text2RVCLipSync(lip_api_key=api_key, rvc_path=rvc_path, model_path=path2model, lip_crop=True)
+
+def set_face(new_face):
+    global face
+    face = new_face
 
 def set_volume(value):
     default_volumem = value
@@ -192,4 +204,5 @@ def voice_video(video_path, pitch, video_chunks=False, use_separator=True, vocal
     return output_video_path
 
 def tts_lip(text):
-    return text2lip(text=text, file_path=file_path, rvc_pitch=rvc_pitch)
+    path2face = file_path + face
+    return text2lip(text=text, file_path=path2face, rvc_pitch=rvc_pitch)
